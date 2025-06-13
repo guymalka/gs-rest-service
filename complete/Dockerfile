@@ -1,26 +1,21 @@
-# Use Eclipse Temurin for Java 17
-FROM eclipse-temurin:17-jdk as build
-
+# Build stage using your local Maven image
+FROM maven:latest AS build
 WORKDIR /app
 
-# Copy Maven project files first to leverage Docker cache
-COPY complete/pom.xml complete/pom.xml
-COPY complete/src /app/src
+# Copy the project files into the expected subdirectory
+COPY pom.xml .
+COPY src ./src
 
-# Build the application (skip tests for speed; remove -DskipTests if you want tests to run)
-RUN apt-get update && apt-get install -y maven && \
-    mvn -f complete/pom.xml clean package -DskipTests
+# Build the application (skip tests for faster build)
+RUN mvn clean package -DskipTests
 
-# Use a smaller image for running the app
-FROM eclipse-temurin:17-jre
-
+# Runtime stage using your local OpenJDK image
+FROM openjdk:latest
 WORKDIR /app
 
 # Copy the built jar from the build stage
-COPY --from=build /app/complete/target/*.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 
-# Expose the default Spring Boot port
+# Expose the port and run the jar
 EXPOSE 8080
-
-# Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
